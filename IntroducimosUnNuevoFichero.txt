@@ -1,0 +1,3 @@
+Un fichero
+con cuatro
+lineas de ejemplo

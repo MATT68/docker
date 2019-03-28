@@ -1,0 +1,6 @@
+Da lo mismo
+lo que contenga 
+este fichero.
+Lo que importa es que hemos
+llamado Variante2 
+a esta nueva branch.

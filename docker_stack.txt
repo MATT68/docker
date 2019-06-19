@@ -1,0 +1,299 @@
+
+ Ya hemos creado un stack antes, pero ahora vamos a hacer algo más cercano a lo real, y es crear un stack con varios servicios.
+ Para ello debemos editar el fichero compose y añadir algún servicio adicional.
+ En este caso añadimos un servicio "visualizer" que carga una imagen standard de docker para visualizar de forma gráfica
+ en el puerto 8080  la información del stack que hemos creado en el swarm.
+
+ Estos son los comandos lanzados y sus respuestas:
+
+PS D:\docker> cd .\python_stack_app
+PS D:\docker\python_stack_app> ls
+    Directorio: D:\docker\python_stack_app
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+-a---        21/03/2019      0:53        708 app.py
+-a---        21/03/2019      0:28        381 docker-compose.yml
+-a---        20/03/2019      0:02        609 Dockerfile
+-a---        19/03/2019     23:08         12 requisitos.txt
+
+PS D:\docker\python_stack_app> notepad .\docker-compose.yml
+Dejamos así el fichero docker-compose.yml:
+---------------------------------------------------------------------------
+version: "3"
+services:
+  web:
+    # Cargamos la imagen que hemos subido al repositorio
+    image: matt68/primerpython:parte2
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+    ports:
+      - "4000:80"
+    networks:
+      - webnet
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+networks:
+  webnet:
+---------------------------------------------------------------------------
+Si alguna máquina del swarm está parada debemos arrancarla.
+*********************************************************************************************
+
+PS D:\docker\python_stack_app> docker-machine ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           *        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   -        virtualbox   Stopped                                       Unknown
+MaquinaVirtual2   -        virtualbox   Stopped                                       Unknown
+
+PS D:\docker\python_stack_app> docker-machine start MaquinaVirtual1
+PS D:\docker\python_stack_app> docker-machine start MaquinaVirtual2
+PS D:\docker\python_stack_app> docker-machine ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           *        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.09.3
+MaquinaVirtual2   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.09.3
+
+PS D:\docker\python_stack_app> docker container ls
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                     NAMES
+c6c7ea6f36ec        redis:latest        "docker-entrypoint.s"   About an hour ago   Up About an hour    0.0.0.0:32768->6379/tcp   redis
+
+*********************************************************************************************
+Con todas las máquinas del swarm activas, podemos desplegar el stack:
+
+PS D:\docker\python_stack_app> docker stack deploy -c .\docker-compose.yml python_stack_app
+Creating network python_stack_app_webnet
+Creating service python_stack_app_web
+Creating service python_stack_app_visualizer
+
+*********************************************************************************************
+Y podemos comprobar que se han creado los cinco containers para el servicio web, y uno para el visualizer.
+Lo podemos ver desde el navegador en la dirección http://localhost:8080/
+
+O bien desde línea de comandos:
+
+PS D:\docker\python_stack_app> docker container ls
+CONTAINER ID        IMAGE                             COMMAND                  CREATED             STATUS              PORTS                     NAMES
+b861148bd317        dockersamples/visualizer:stable   "npm start"              20 seconds ago      Up 22 seconds       8080/tcp                  python_stack_app_visualizer.1.ou7lh630n9vggeq9vubuunp96
+881773cec1aa        matt68/primerpython:parte2        "python app.py"          40 seconds ago      Up 42 seconds       80/tcp                    python_stack_app_web.5.xavrb5mf3eev2j1g3dpzjjott
+c6c7ea6f36ec        redis:latest                      "docker-entrypoint.s"   About an hour ago   Up About an hour    0.0.0.0:32768->6379/tcp   redis
+PS D:\docker\python_stack_app> docker-machine ssh MaquinaVirtual1 "docker container ls"
+CONTAINER ID        IMAGE                        COMMAND             CREATED              STATUS              PORTS               NAMES
+1612eeb45660        matt68/primerpython:parte2   "python app.py"     About a minute ago   Up About a minute   80/tcp              python_stack_app_web.4.ldxisra1stw3zd5stc6ahxo8w
+affb9a651b26        matt68/primerpython:parte2   "python app.py"     About a minute ago   Up About a minute   80/tcp              python_stack_app_web.2.tq9a0j456izwy81pb76d15img
+
+PS D:\docker\python_stack_app> docker-machine ssh MaquinaVirtual2 "docker container ls"
+CONTAINER ID        IMAGE                        COMMAND             CREATED              STATUS              PORTS               NAMES
+83cbc961daab        matt68/primerpython:parte2   "python app.py"     About a minute ago   Up About a minute   80/tcp              python_stack_app_web.3.nyn772fjppsaskvramxm5zr63
+11f5e4abecb0        matt68/primerpython:parte2   "python app.py"     About a minute ago   Up About a minute   80/tcp              python_stack_app_web.1.pfdid31haz28olzectgkeykmy
+
+
+*********************************************************************************************
+O también ver los procesos/tasks del stack:
+PS D:\docker\python_stack_app> docker stack ls
+NAME                SERVICES            ORCHESTRATOR
+python_stack_app    2                   Swarm
+
+PS D:\docker\python_stack_app> docker stack services python_stack_app
+ID                  NAME                          MODE                REPLICAS            IMAGE                             PORTS
+58osbp9y0xjl        python_stack_app_web          replicated          5/5                 matt68/primerpython:parte2        *:4000->80/tcp
+ocfwlvt08yqn        python_stack_app_visualizer   replicated          1/1                 dockersamples/visualizer:stable   *:8080->8080/tcp
+
+PS D:\docker\python_stack_app> docker stack ps python_stack_app
+ID                  NAME                            IMAGE                             NODE                DESIRED STATE       CURRENT STATE         ERROR         PORTS
+ou7lh630n9vg        python_stack_app_visualizer.1   dockersamples/visualizer:stable   default             Running             Running 2 h ago
+pfdid31haz28        python_stack_app_web.1          matt68/primerpython:parte2        MaquinaVirtual2     Running             Running 2 h ago
+tq9a0j456izw        python_stack_app_web.2          matt68/primerpython:parte2        MaquinaVirtual1     Running             Running 2 h ago
+nyn772fjppsa        python_stack_app_web.3          matt68/primerpython:parte2        MaquinaVirtual2     Running             Running 2 h ago
+ldxisra1stw3        python_stack_app_web.4          matt68/primerpython:parte2        MaquinaVirtual1     Running             Running 2 h ago
+xavrb5mf3eev        python_stack_app_web.5          matt68/primerpython:parte2        default             Running             Running 2 h ago
+
+*********************************************************************************************
+ Para terminar con esta parte, vamos a añadir un último servicio al compose. 
+Se trata del servicio redis para que los datos persistan entre un despliegue y otro del stack.
+
+PS D:\docker\python_stack_app> notepad .\docker-compose.yml
+Editamos así el fichero docker-compose.yml:
+---------------------------------------------------------------------------
+version: "3"
+services:
+  web:
+    # Cargamos la imagen que hemos subido al repositorio
+    image: matt68/primerpython:parte2
+    deploy:
+      replicas: 5
+      restart_policy:
+        condition: on-failure
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+    ports:
+      - "4000:80"
+    networks:
+      - webnet
+  visualizer:
+    image: dockersamples/visualizer:stable
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - webnet
+ redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - "/home/docker/data:/data"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    command: redis-server --appendonly yes
+    networks:
+      - webnet
+ networks:
+  webnet:
+---------------------------------------------------------------------------
+
+Antes de desplegar el stack debemos crear el directorio /home/docker/data dentro de la VM. 
+
+PS D:\docker\python_stack_redis_app> docker-machine ssh default "ls /home/docker"
+PS D:\docker\python_stack_redis_app> docker-machine ssh default "ls -ltr /home/docker"
+total 0
+PS D:\docker\python_stack_redis_app> docker-machine ssh default "pwd"
+/home/docker
+PS D:\docker\python_stack_redis_app> docker-machine ssh default "mkdir ./data"
+PS D:\docker\python_stack_redis_app> docker-machine ssh default "ls -ltr /home/docker"
+total 0
+drwxr-sr-x    2 999      staff           60 Mar 21 12:44 ?[1;34mdata?[0m
+
+*********************************************************************************************
+ Hacemos de nuevo el deploy y se actualizan los servicios.
+ Podremos comprobar que aparece un nuevo container con el servicio redis.
+
+PS D:\docker\python_stack_redis_app> docker stack deploy -c .\docker-compdoose.yml python_stack_app
+Updating service python_stack_app_visualizer (id: ocfwlvt08yqnbmsp21gw5pmes)
+Updating service python_stack_app_redis (id: n5vs7rg2sjuofyh67nk10t9st)
+Updating service python_stack_app_web (id: 58osbp9y0xjlp2mnevvd2rm8m)
+
+Si accedemos al visualizer veremos el nuevo container, y si abrimos localhost:4000 en un navegador
+podremos comprobar cómo el contador de visitas ya funciona (apuntamos el número actual).
+
+*********************************************************************************************
+Ahora vamos a comprobar cómo persisten los datos. 
+Paramos el servicio.
+
+PS D:\docker\python_stack_redis_app> docker stack ls
+NAME                SERVICES            ORCHESTRATOR
+python_stack_app    3                   Swarm
+
+PS D:\docker\python_stack_redis_app> docker stack  rm python_stack_app
+Removing service python_stack_app_redis
+Removing service python_stack_app_visualizer
+Removing service python_stack_app_web
+Removing network python_stack_app_webnet
+
+PS D:\docker\python_stack_redis_app> docker stack ps python_stack_app
+ID                  NAME                          IMAGE                        NODE                DESIRED STATE       CURRENT STATE           ERROR   PORTS
+pfdid31haz28        58osbp9y0xjlp2mnevvd2rm8m.1   matt68/primerpython:parte2   MaquinaVirtual2     Remove              Running 3 seconds ago
+tq9a0j456izw        58osbp9y0xjlp2mnevvd2rm8m.2   matt68/primerpython:parte2   MaquinaVirtual1     Remove              Running 3 seconds ago
+nyn772fjppsa        58osbp9y0xjlp2mnevvd2rm8m.3   matt68/primerpython:parte2   MaquinaVirtual2     Remove              Running 3 seconds ago
+ldxisra1stw3        58osbp9y0xjlp2mnevvd2rm8m.4   matt68/primerpython:parte2   MaquinaVirtual1     Remove              Running 3 seconds ago
+xavrb5mf3eev        58osbp9y0xjlp2mnevvd2rm8m.5   matt68/primerpython:parte2   default             Remove              Running 2 seconds ago
+
+-- Muestra los procesos porque no hemos dado tiempo a que los pare.
+
+PS D:\docker\python_stack_redis_app> docker stack services python_stack_app
+Nothing found in stack: python_stack_app
+
+--Probamos de nuevo con los procesos (y comprobamos que ya están parados):
+PS D:\docker\python_stack_redis_app> docker stack ps python_stack_app
+nothing found in stack: python_stack_app
+
+**************************************************************************************************************************
+Una vez parado el stack, volvemos a desplegarlo.
+
+PS D:\docker\python_stack_redis_app> docker stack deploy -c .\docker-compose.yml python_stack_app
+Creating network python_stack_app_webnet
+Creating service python_stack_app_redis
+Creating service python_stack_app_web
+Creating service python_stack_app_visualizer
+
+PS D:\docker\python_stack_redis_app> docker stack ps python_stack_app
+ID                  NAME                            IMAGE                             NODE                DESIRED STATE       CURRENT STATE    hkjajkxhmwxw        python_stack_app_visualizer.1   dockersamples/visualizer:stable   default             Running             Running 12
+z8066sl1k3we        python_stack_app_web.1          matt68/primerpython:parte2        MaquinaVirtual1     Running             Running 14
+wszlf7ofdrza        python_stack_app_redis.1        redis:latest                      default             Running             Running 18
+kdr2rjswwuvb        python_stack_app_web.2          matt68/primerpython:parte2        MaquinaVirtual2     Running             Running 14
+lfxot725ktfa        python_stack_app_web.3          matt68/primerpython:parte2        MaquinaVirtual1     Running             Running 14
+wg3qghv3d7np        python_stack_app_web.4          matt68/primerpython:parte2        MaquinaVirtual2     Running             Running 14
+pi2a94xbyn1x        python_stack_app_web.5          matt68/primerpython:parte2        default             Running             Running 15
+
+-- Y si ahora accedemos a localhost:4000 en un navegador podremos comprobar que el contador de visitas continua sumando 
+ desde el número tomado antes. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 

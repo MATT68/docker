@@ -1,0 +1,374 @@
+
+ Para crear un cluster necesitamos varios PCs con docker, y como probablemente no los tengamos usaremos nuestra máquina (con su docker) y un par de máquinas virtuales, con las tres montaremos un docker swarm de tres nodos. Un master y dos worker.
+
+Primero comprobarmos las variables de entorno de nuestra docker-machine "default" y a continuación creamos las dos máquinas virtuales :
+
+***********************************************************************************************************
+PS D:\docker\python_app> docker-machine env
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.100:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\MAP\.docker\machine\machines\default"
+$Env:DOCKER_MACHINE_NAME = "default"
+$Env:COMPOSE_CONVERT_WINDOWS_PATHS = "true"
+# Run this command to configure your shell:
+# & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env | Invoke-Expression
+
+PS D:\docker\python_app> docker-machine create --driver virtualbox MaquinaVirtual1
+Running pre-create checks...
+(MaquinaVirtual1) Default Boot2Docker ISO is out-of-date, downloading the latest release...
+(MaquinaVirtual1) Latest release for github.com/boot2docker/boot2docker is v18.09.3
+(MaquinaVirtual1) Downloading C:\Users\MAP\.docker\machine\cache\boot2docker.iso from https://github.com/boot2docker/boot2docker/releases/download/v18.09.3/boot
+2docker.iso...
+(MaquinaVirtual1) 0%....10%....20%....30%....40%....50%....60%....70%....80%....90%....100%
+Creating machine...
+(MaquinaVirtual1) Copying C:\Users\MAP\.docker\machine\cache\boot2docker.iso to C:\Users\MAP\.docker\machine\machines\MaquinaVirtual1\boot2docker.iso...
+(MaquinaVirtual1) Creating VirtualBox VM...
+(MaquinaVirtual1) Creating SSH key...
+(MaquinaVirtual1) Starting the VM...
+(MaquinaVirtual1) Check network to re-create if needed...
+(MaquinaVirtual1) Windows might ask for the permission to configure a dhcp server. Sometimes, such confirmation window is minimized in the taskbar.
+(MaquinaVirtual1) Waiting for an IP...
+Waiting for machine to be running, this may take a few minutes...
+Detecting operating system of created instance...
+Waiting for SSH to be available...
+Detecting the provisioner...
+Provisioning with boot2docker...
+Copying certs to the local machine directory...
+Copying certs to the remote machine...
+Setting Docker configuration on the remote daemon...
+Checking connection to Docker...
+Docker is up and running!
+To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe env MaquinaVirtual1
+
+PS D:\docker\python_app> docker-machine create --driver virtualbox MaquinaVirtual2
+Running pre-create checks...
+Creating machine...
+(MaquinaVirtual2) Copying C:\Users\MAP\.docker\machine\cache\boot2docker.iso to C:\Users\MAP\.docker\machine\machines\MaquinaVirtual2\boot2docker.iso...
+(MaquinaVirtual2) Creating VirtualBox VM...
+(MaquinaVirtual2) Creating SSH key...
+(MaquinaVirtual2) Starting the VM...
+(MaquinaVirtual2) Check network to re-create if needed...
+(MaquinaVirtual2) Windows might ask for the permission to configure a dhcp server. Sometimes, such confirmation window is minimized in the taskbar.
+(MaquinaVirtual2) Waiting for an IP...
+Waiting for machine to be running, this may take a few minutes...
+Detecting operating system of created instance...
+Waiting for SSH to be available...
+Detecting the provisioner...
+Provisioning with boot2docker...
+Copying certs to the local machine directory...
+Copying certs to the remote machine...
+Setting Docker configuration on the remote daemon...
+Checking connection to Docker...
+Docker is up and running!
+To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe env MaquinaVirtual2
+
+PS D:\docker\python_app> docker-machine env MaquinaVirtual1
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.101:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\MAP\.docker\machine\machines\MaquinaVirtual1"
+$Env:DOCKER_MACHINE_NAME = "MaquinaVirtual1"
+$Env:COMPOSE_CONVERT_WINDOWS_PATHS = "true"
+# Run this command to configure your shell:
+# & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env MaquinaVirtual1 | Invoke-Expression
+
+PS D:\docker\python_app> docker-machine env MaquinaVirtual2
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.102:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\MAP\.docker\machine\machines\MaquinaVirtual2"
+$Env:DOCKER_MACHINE_NAME = "MaquinaVirtual2"
+$Env:COMPOSE_CONVERT_WINDOWS_PATHS = "true"
+# Run this command to configure your shell:
+# & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env MaquinaVirtual2 | Invoke-Expression
+PS D:\docker\python_app>
+
+***********************************************************************************************************
+Y por último podemos comprobar todas las máquinas virtuales que tenemos:
+(en nuestro caso aparece "default" porque en Windows 7 no disponemos de Hyper-V y docker se ejecuta sobre una VM de VirtualBox).
+
+PS D:\docker\python_app> docker-machine ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           *        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.09.3
+MaquinaVirtual2   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.09.3
+PS D:\docker\python_app>
+
+***********************************************************************************************************
+Ahora ya podemos crear un cluster, para ello inicializamos el swarm y agregamos los nodos.
+La primera máquina en el swarm será el swarm manager, y el resto los workers.
+
+PS D:\docker\python_app> docker swarm init
+Error response from daemon: could not choose an IP address to advertise since this system has multiple addresses on different interfaces (10.0.2.15 on eth0 and 192.168.99.100 on eth1) - specify one with --advertise-addr
+
+PS D:\docker\python_app> docker swarm init --advertise-addr eth1
+Swarm initialized: current node (oprcqsuqeojyvhnqyuyx0es14) is now a manager.
+
+To add a worker to this swarm, run the following command:
+    docker swarm join --token SWMTKN-1-1z0deaqcl122uvumhui0e4t6hu4ylwesttcib1mt9kkwmh0a9d-0rbfbvaxvqeyvbuudgottbyvs 192.168.99.100:2377
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+
+PS D:\docker\python_app> docker-machine ssh MaquinaVirtual1 "docker swarm join --token SWMTKN-1-1z0deaqcl122uvumhui0e4t6hu4ylwesttcib1mt9kkwmh0a9d-0rbfbvaxvqeyvbuudgottbyvs 192.168.99.100:2377"
+
+This node joined a swarm as a worker.
+
+PS D:\docker\python_app> docker-machine ssh MaquinaVirtual2 "docker swarm join --token SWMTKN-1-1z0deaqcl122uvumhui0e4t6hu4ylwesttcib1mt9kkwmh0a9d-0rbfbvaxvqeyvbuudgottbyvs 192.168.99.100:2377"
+
+This node joined a swarm as a worker.
+
+PS D:\docker\python_app> docker node ls
+ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
+83sa6v24swn757x6naylo50ri     MaquinaVirtual1     Ready               Active                                  18.09.3
+qrcwqkstzn6m0sg81gcs4nr5o     MaquinaVirtual2     Ready               Active                                  18.09.3
+oprcqsuqeojyvhnqyuyx0es14 *   default             Ready               Active              Leader              18.09.2
+
+***********************************************************************************************************************************
+             Cambiando la máquina destino de los comandos de la shell
+***********************************************************************************************************************************
+Para lanzar comandos a MaquinaVirtualx lanzamos "docker-machine ssh MaquinaVirtualx ..."
+
+PS D:\docker\python_app> docker-machine  ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           *        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.09.3
+MaquinaVirtual2   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.09.3
+
+Los comandos van directamente a la máquina que tiene el *
+Si queremos que por defecto vayan a otra máquina sin usar "docker-machine ssh MaquinaVirtual1 ..." deberíamos hacer:
+
+PS D:\docker\python_app> docker-machine env MaquinaVirtual1
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.101:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\MAP\.docker\machine\machines\MaquinaVirtual1"
+$Env:DOCKER_MACHINE_NAME = "MaquinaVirtual1"
+$Env:COMPOSE_CONVERT_WINDOWS_PATHS = "true"
+# Run this command to configure your shell:
+# & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env MaquinaVirtual1 | Invoke-Expression
+
+PS D:\docker\python_app> & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env MaquinaVirtual1 | Invoke-Expression
+
+PS D:\docker\python_app> docker node ls
+
+Error response from daemon: This node is not a swarm manager. Worker nodes can't be used to view or modify cluster state. Please run this command on a manager node or promote the current node to a manager.
+
+***********************************************************************************************************************************
+Falla porque el comando se ha ido directamente a MaquinaVirtual1, que es un worker y no admite comandos. Es como si lanzaramos:
+
+PS D:\docker\python_app> docker-machine ssh MaquinaVirtual1 "docker node ls"
+Error response from daemon: This node is not a swarm manager. Worker nodes can't be used to view or modify cluster state. Please run this command on a manager node or promote the current node to a manager.
+Process exited with status 1
+
+Podemos ver quién recibe ahora los comandos directos:
+PS D:\docker\python_app> docker-machine  ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           -        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   *        virtualbox   Running   tcp://192.168.99.101:2376           v18.09.3
+MaquinaVirtual2   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.09.3
+
+Al haber puesto a MaquinaVirtual1 como la máquina a la que se dirigen los comandos, si queremos lanzar algo a "default" deberíamos lanzar:
+
+PS D:\docker\python_app> docker-machine ssh default "docker node ls"
+ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
+83sa6v24swn757x6naylo50ri     MaquinaVirtual1     Ready               Active                                  18.09.3
+qrcwqkstzn6m0sg81gcs4nr5o     MaquinaVirtual2     Ready               Active                                  18.09.3
+oprcqsuqeojyvhnqyuyx0es14 *   default             Ready               Active              Leader              18.09.2
+
+***********************************************************************************************************************************
+Deshacemos para dejarlo como estaba:
+
+PS D:\docker\python_app> & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env default | Invoke-Expression
+PS D:\docker\python_app> docker-machine  ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           *        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.09.3
+MaquinaVirtual2   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.09.3
+
+***********************************************************************************************************************************
+    FIN     Cambiando la máquina destino de los comandos de la shell
+***********************************************************************************************************************************
+
+***********************************************************************************************************************************
+***********************************************************************************************************************************
+    Desplegando la app en el swarm cluster
+***********************************************************************************************************************************
+Desde el directorio donde tenemos el fichero docker-compose.yml lanzamos el deploy al swarm manager: 
+(esta vez vamos a indicar 6 réplicas en el fichero compose)
+                         
+PS D:\docker\python_app> docker stack deploy -c docker-compose.yml app_python_en_cluster
+Creating network app_python_en_cluster_webnet
+Creating service app_python_en_cluster_web
+
+PS D:\docker\python_app> docker stack ls
+NAME                    SERVICES            ORCHESTRATOR
+app_python_en_cluster   1                   Swarm
+
+PS D:\docker\python_app> docker stack ps app_python_en_cluster    (vemos las task en el servicio)
+ID                  NAME                          IMAGE                        NODE                DESIRED STATE       CURRENT STATE   
+xneqbgx06t0e        app_python_en_cluster_web.1   matt68/primerpython:parte2   MaquinaVirtual1     Running             Running 7 seconds ago
+lo5l0wccfltr        app_python_en_cluster_web.2   matt68/primerpython:parte2   MaquinaVirtual2     Running             Running 6 seconds ago
+xh3zgwcpzihd        app_python_en_cluster_web.3   matt68/primerpython:parte2   default             Running             Running 24 seconds ago
+m69mfn6xgjrr        app_python_en_cluster_web.4   matt68/primerpython:parte2   MaquinaVirtual1     Running             Running 7 seconds ago
+9myln1h3bwyl        app_python_en_cluster_web.5   matt68/primerpython:parte2   MaquinaVirtual2     Running             Running 6 seconds ago
+4o5hm5sdmmgb        app_python_en_cluster_web.6   matt68/primerpython:parte2   default             Running             Running 24 seconds ago
+
+PS D:\docker\python_app> docker-machine  ls
+NAME              ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER     ERRORS
+default           *        virtualbox   Running   tcp://192.168.99.100:2376           v18.09.2
+MaquinaVirtual1   -        virtualbox   Running   tcp://192.168.99.101:2376           v18.09.3
+MaquinaVirtual2   -        virtualbox   Running   tcp://192.168.99.102:2376           v18.09.3
+
+***********************************************************************************************************************************
+En paralelo deberíamos abrir el navegador en: 
+192.168.99.100:4000
+192.168.99.101:4000
+192.168.99.102:4000
+Y comprobar que todas ellas nos dan servicio. Incluso deberíamos comprobar que si refrescamos una misma dirección (192.168.99.100:4000)
+seis veces, veremos cómo cambia el hostname que nos da servicio.
+
+PS D:\docker\python_app> docker container  ls    (vemos los containers en la máquina "default")
+CONTAINER ID        IMAGE                        COMMAND             CREATED             STATUS              PORTS               NAMES
+e9794abf7bae        matt68/primerpython:parte2   "python app.py"     4 minutes ago       Up 4 minutes        80/tcp    app_python_en_cluster_web.3.xh3zgwcpzihdgv6qvhntdb2du
+5bfd044f7a7f        matt68/primerpython:parte2   "python app.py"     4 minutes ago       Up 4 minutes        80/tcp              app_python_en_cluster_web.6.4o5hm5sdmmgbbssqu3rkcukwx
+
+
+PS D:\docker\python_app> docker-machine  ssh MaquinaVirtual2 "docker container ls"
+CONTAINER ID        IMAGE                        COMMAND             CREATED             STATUS              PORTS               NAMES
+d214f792af90        matt68/primerpython:parte2   "python app.py"     5 minutes ago       Up 5 minutes        80/tcp              app_python_en_cluster_web.5.9myln1h3bwylmmtpmxztzb09x
+40a8f5f81343        matt68/primerpython:parte2   "python app.py"     5 minutes ago       Up 5 minutes        80/tcp              app_python_en_cluster_web.2.lo5l0wccfltre26shvyyf46b2
+
+PS D:\docker\python_app>
+
+***********************************************************************************************************************************
+***********************************************************************************************************************************
+   Actualizando el servicio y escalando la aplicación
+***********************************************************************************************************************************
+***********************************************************************************************************************************
+
+Podemos modificar el fichero compose para añadir réplicas y así tener más tareas por servicio.
+Y tambíen podemos actualizar la aplicación y ponerla disponible en el swarm inmediatamente. Sólo hace falta:
+- modificar
+- hacer el build 
+- push, para actualizar el repositorio
+- stack deploy, y el servicio se actualiza con la modificación de la app. 
+
+PS D:\docker\python_app> ls
+    Directorio: D:\docker\python_app
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+-a---        20/03/2019      0:03        703 app.py
+-a---        21/03/2019      0:28        381 docker-compose.yml
+-a---        20/03/2019      0:02        609 Dockerfile
+-a---        19/03/2019     23:08         12 requisitos.txt
+
+Modificamcos app.py para que ahora muestre algunos caracteres diferentes. Por ejemplo, dos admiraciones en "Hombreee Amparooo !!" y que muestre "visitas" en lugar de "visits".
+
+***********************************************************************************************************************************
+PS D:\docker\python_app> docker build  -t=holaamparo .
+Sending build context to Docker daemon  6.144kB
+Step 1/7 : FROM python:2.7-slim
+ ---> 8559620b5b0d
+Step 2/7 : WORKDIR /app
+ ---> Running in 892dd9147678
+Removing intermediate container 892dd9147678
+ ---> 14c3049f1b94
+Step 3/7 : COPY . /app
+ ---> 274b0b633ba1
+Step 4/7 : RUN pip install --trusted-host pypi.python.org -r requisitos.txt
+ ---> Running in 2dad16c2b188
+DEPRECATION: Python 2.7 will reach the end of its life on January 1st, 2020. Please upgrade your Python as Python 2.7 won't be maintained after that date. A future version of pip will drop support for Python 2.7.
+Collecting Flask (from -r requisitos.txt (line 1))
+  Downloading https://files.pythonhosted.org/packages/7f/e7/08578774ed4536d3242b14dacb4696386634607af824ea997202cd0edb4b/Flask-1.0.2-py2.py3-none-any.whl (91kB)
+Collecting Redis (from -r requisitos.txt (line 2))
+  Downloading https://files.pythonhosted.org/packages/ac/a7/cff10cc5f1180834a3ed564d148fb4329c989cbb1f2e196fc9a10fa07072/redis-3.2.1-py2.py3-none-any.whl (65kB)
+Collecting itsdangerous>=0.24 (from Flask->-r requisitos.txt (line 1))
+  Downloading https://files.pythonhosted.org/packages/76/ae/44b03b253d6fade317f32c24d100b3b35c2239807046a4c953c7b89fa49e/itsdangerous-1.1.0-py2.py3-none-any.whl
+Collecting Jinja2>=2.10 (from Flask->-r requisitos.txt (line 1))
+  Downloading https://files.pythonhosted.org/packages/7f/ff/ae64bacdfc95f27a016a7bed8e8686763ba4d277a78ca76f32659220a731/Jinja2-2.10-py2.py3-none-any.whl (126kB)
+Collecting Werkzeug>=0.14 (from Flask->-r requisitos.txt (line 1))
+  Downloading https://files.pythonhosted.org/packages/29/5e/d54398f8ee78166d2cf07e46d19096e55aba506e44de998a1ad85b83ec8d/Werkzeug-0.15.0-py2.py3-none-any.whl (328kB)
+Collecting click>=5.1 (from Flask->-r requisitos.txt (line 1))
+  Downloading https://files.pythonhosted.org/packages/fa/37/45185cb5abbc30d7257104c434fe0b07e5a195a6847506c074527aa599ec/Click-7.0-py2.py3-none-any.whl (81kB)
+Collecting MarkupSafe>=0.23 (from Jinja2>=2.10->Flask->-r requisitos.txt (line 1))
+  Downloading https://files.pythonhosted.org/packages/fb/40/f3adb7cf24a8012813c5edb20329eb22d5d8e2a0ecf73d21d6b85865da11/MarkupSafe-1.1.1-cp27-cp27mu-manylinux1_x86_64.whl
+Installing collected packages: itsdangerous, MarkupSafe, Jinja2, Werkzeug, click, Flask, Redis
+Successfully installed Flask-1.0.2 Jinja2-2.10 MarkupSafe-1.1.1 Redis-3.2.1 Werkzeug-0.15.0 click-7.0 itsdangerous-1.1.0
+Removing intermediate container 2dad16c2b188
+ ---> f25fb3d24d2f
+Step 5/7 : EXPOSE 80
+ ---> Running in 11938b0fdbba
+Removing intermediate container 11938b0fdbba
+ ---> 13836b4bafe2
+Step 6/7 : ENV NAME Amparoooo
+ ---> Running in e6a444b435cd
+Removing intermediate container e6a444b435cd
+ ---> ecb842b551fc
+Step 7/7 : CMD ["python", "app.py"]
+ ---> Running in 36dbb2c1283c
+Removing intermediate container 36dbb2c1283c
+ ---> 110e63fb7c46
+Successfully built 110e63fb7c46
+Successfully tagged holaamparo:latest
+SECURITY WARNING: You are building a Docker image from Windows against a non-Windows Docker host. All files and directories added to build context will have '-r
+wxr-xr-x' permissions. It is recommended to double check and reset permissions for sensitive files and directories.
+
+***********************************************************************************************************************************
+PS D:\docker\python_app> docker container ls
+CONTAINER ID        IMAGE                        COMMAND             CREATED             STATUS              PORTS               NAMES
+e9794abf7bae        matt68/primerpython:parte2   "python app.py"     26 minutes ago      Up 26 minutes       80/tcp              app_python_en_cluster_web.3.xh3zgwcpzihdgv6qvhntdb2du
+5bfd044f7a7f        matt68/primerpython:parte2   "python app.py"     26 minutes ago      Up 26 minutes       80/tcp              app_python_en_cluster_web.6.4o5hm5sdmmgbbssqu3rkcukwx
+
+PS D:\docker\python_app> docker images
+REPOSITORY            TAG                 IMAGE ID            CREATED             SIZE
+holaamparo            latest              110e63fb7c46        16 seconds ago      131MB
+matt68/primerpython   parte2              3fa47d618081        25 hours ago        131MB
+matt68                db2expc             a170bf8c410b        8 days ago          1.71GB
+python                2.7-slim            8559620b5b0d        2 weeks ago         120MB
+ubuntu                latest              47b19964fb50        6 weeks ago         88.1MB
+centos                latest              1e1148e4cc2c        3 months ago        202MB
+ibmcom/db2express-c   latest              7aa154d9b73c        3 years ago         1.71GB
+
+***********************************************************************************************************************************
+Si quisiera crear un container debería fallar porque ahora mismo el puerto 4000 está ocupado por el swarm cluster.
+
+PS D:\docker\python_app> docker run -d --name python1 -p 4000:80 holaamparo
+b7c1e6d4963a2842447d028f184a6217828b820770b16730b036c9aae3f400f7
+C:\ProgramData\chocolatey\lib\docker-cli\tools\docker.exe: Error response from daemon: driver failed programming external connectivity on endpoint python1 (c979138fd13902dab2263d6f9c5d77c063fc9a8034653a66af472cbc55848aee): Error starting userland proxy: listen tcp 0.0.0.0:4000: bind: address already in use.
+
+PS D:\docker\python_app> docker container ls -a
+CONTAINER ID        IMAGE                        COMMAND                   CREATED             STATUS                      PORTS               NAMES
+b7c1e6d4963a        holaamparo                   "python app.py"           6 seconds ago       Created                                         python1
+e9794abf7bae        matt68/primerpython:parte2   "python app.py"           27 minutes ago      Up 27 minutes               80/tcp              app_python_en_cluster_web.3.xh3zgwcpzihdgv6qvhntdb2du
+5bfd044f7a7f        matt68/primerpython:parte2   "python app.py"           27 minutes ago      Up 27 minutes               80/tcp              app_python_en_cluster_web.6.4o5hm5sdmmgbbssqu3rkcukwx
+31e06c85df74        matt68:db2expc               "/entrypoint.sh db2s"    8 days ago          Exited (137) 25 hours ago                       db2expc
+34105323b9e6        ibmcom/db2express-c:latest   "/entrypoint.sh db2s"    9 days ago          Exited (137) 25 hours ago                       focused_robinson
+8a1e36b18a8e        ubuntu                       "/bin/sh -c 'while\nt"   2 weeks ago         Exited (137) 2 weeks ago                        daemon_dave
+72a5314149bf        ubuntu                       "/bash"                   2 weeks ago         Created                                         unruffled_ellis
+PS D:\docker\python_app> docker rm python1
+python1
+
+***********************************************************************************************************************************
+Etiquetamos la nueva imagen y la subimos al repositorio:
+
+PS D:\docker\python_app> docker tag holaamparo matt68/primerpython:parte2
+
+PS D:\docker\python_app> docker push matt68/primerpython:parte2
+The push refers to repository [docker.io/matt68/primerpython]
+6adcd6b331bd: Pushed
+ce2d5ba67a39: Pushed
+7ebdf311af75: Pushed
+c39d784764e0: Layer already exists
+4bad4dc0f0f2: Layer already exists
+d443bc70f9c5: Layer already exists
+6744ca1b1190: Layer already exists
+parte2: digest: sha256:a616870b93efa10cf885fe39e491261e8a5aba31d6dd3d7142871e2883116069 size: 1789
+
+***********************************************************************************************************************************
+Y por último hacemos un nuevo deploy:
+
+PS D:\docker\python_app> docker stack ls
+NAME                    SERVICES            ORCHESTRATOR
+app_python_en_cluster   1                   Swarm
+
+PS D:\docker\python_app> docker stack deploy -c .\docker-compose.yml app_python_en_cluster
+Updating service app_python_en_cluster_web (id: k4z55e3pqiqo2ne27te81mq2u)
+
+***********************************************************************************************************************************
+Y ya podemos comprobar que el servicio se ha actualizado. 

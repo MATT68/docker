@@ -1,0 +1,292 @@
+
+ 
+*****************************************************************************************************************
+ Lo primero de todo, es recordar que Kubernetes no hace build de imágenes, ni push, ni nada que "defina" los 
+ contenedores por dentro.
+ Kubernetes es sólo el carguero que lleva los containers. 
+ Se ocupa de gestionar esos containers. 
+
+*****************************************************************************************************************
+
+ En este ejemplo vamos a crear primero una imagen con docker y luego vamos a desplegarla con kubernetes en un 
+ cluster que previamente estará levantado.
+
+ Para definir el cluster hemos usado minikube. La alternativa sería definirlo en la nube y pagar por ello.
+
+*****************************************************************************************************************
+ Tenemos dos ficheros en el workdir. 
+  app.js 
+  Dockerfile
+
+ app.js
+ ---------------------------------------------------------------------
+     var http = require('http');
+
+     var handleRequest = function(request, response) {
+         console.log('Recibida llamada desde URL: ' + request.url);
+         response.writeHead(200);
+         response.end(' Hombre Amparo !!! Qué haces en este cluster?? ');
+     };
+     var www = http.createServer(handleRequest);
+     www.listen(8080);
+
+ Dockerfile
+ ---------------------------------------------------------------------
+    FROM node:6.14.2
+    EXPOSE 8080
+    COPY app.js .
+    CMD node app.js
+
+*****************************************************************************************************************
+ Vamos a hacer el build de la imagen. La vamos a llamar "matt68/kuberfirst:parte1". 
+ (la nombramos bien por si luego quiero subirla al repositorio).
+ Para ello comprobamos todo.  
+
+PS D:\docker\minikube_cluster_example> ls .
+
+
+    Directorio: D:\docker\minikube_cluster_example
+
+
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+-a---        26/03/2019     11:52        353 app.js
+-a---        26/03/2019     11:43          0 Deployment en Kubernetes.txt
+-a---        26/03/2019     11:53         77 Dockerfile
+
+*****************************************************************************************************************
+ Y hacemos el build:
+
+PS D:\docker\minikube_cluster_example> docker build -t=matt68/kuberfirst:parte1 .
+Sending build context to Docker daemon  3.584kB
+Step 1/4 : FROM node:6.14.2
+6.14.2: Pulling from library/node
+3d77ce4481b1: Pull complete
+
+0c5cf711b890: Download complete
+9593dc852d6b: Downloading [==============================>                    ]  80.14MB/131.1MB
+4e3b8a1eb914: Download complete
+ddcf13cc1951: Download complete
+2e460d114172: Download complete
+d94b1226fbf2: Download complete
+Digest: sha256:62b9d88be259a344eb0b4e0dd1b12347acfe41c1bb0f84c3980262f8032acc5a
+Status: Downloaded newer image for node:6.14.2
+ ---> 00165cd5d0c0
+Step 2/4 : EXPOSE 8080
+ ---> Running in d9624972b9b3
+Removing intermediate container d9624972b9b3
+ ---> 5cb6fc82f694
+Step 3/4 : COPY app.js .
+ ---> 57e5e080a118
+Step 4/4 : CMD node app.js
+ ---> Running in e63c69e48239
+Removing intermediate container e63c69e48239
+ ---> aa9371e0d5a3
+Successfully built aa9371e0d5a3
+Successfully tagged matt68/kuberfirst:parte1
+SECURITY WARNING: You are building a Docker image from Windows against a non-Windows Docker host. All files and directories added to build context will have '
+wxr-xr-x' permissions. It is recommended to double check and reset permissions for sensitive files and directories.
+
+*****************************************************************************************************************
+Comprobamos las imagenes locales:
+
+PS D:\docker\minikube_cluster_example> docker images
+REPOSITORY                 TAG                 IMAGE ID            CREATED             SIZE
+matt68/kuberfirst          parte1              aa9371e0d5a3        3 minutes ago       660MB
+holaamparo                 latest              110e63fb7c46        5 days ago          131MB 
+  ....
+
+*****************************************************************************************************************
+ Y ahora, para correr la imagen -y crear la instancia- podríamos hacer:
+
+ 1.- Ejecutar en un solo container.
+ docker run -d --name app1  -p 8080:8080 matt68/kuberfirst:parte1
+
+ 2.- Ejecutarlo en un cluster bajo docker. 
+  Deberíamos usar varias máquinas (físicas o virtuales), definir un docker swarm y en él, lanzar un docker stack 
+ (es decir, los pasos  que hicimos en un ejercicio anterior), con un comando como el siguiente: 
+    docker stack deploy -c docker-compose.yml app_python_en_cluster 
+
+ 3.- En este caso queremos ejecutarlo en Kubernetes. Y aquí empieza lo divertido:
+
+*****************************************************************************************************************
+   Primero debemos hacer funcionar un cluster 
+   en kubernetes, y el más "barato" en un portatil es minikube.
+   Antes hemos creado el cluster con:
+   minikube start 
+
+   Y ahora comprobamos el estado antes de desplegar la app:
+
+PS D:\docker\minikube_cluster_example> minikube status
+host: Running
+kubelet: Running
+apiserver: Running
+kubectl: Misconfigured: pointing to stale minikube-vm.
+To fix the kubectl context, run minikube update-context
+
+*****************************************************************************************************************
+*****************************************************************************************************************
+Para ejecutar la imagen en kubernetes, debemos primero desplegar la imagen en el cluster. El comando es:
+
+PS D:\docker\minikube_cluster_example> kubectl create deployment hombreamparokube --image=matt68/kuberfirst:parte1
+deployment.apps/hombreamparokube created
+
+El primer error que encontraremos es que por defecto kubectl va a descargar la imagen del docker hub y si no la hemos 
+subido, el container no podrá funcionar.
+
+Tendremos algo así:
+
+PS D:\docker\minikube_cluster_example> kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+hombreamparokube   0/1     1            0           87s
+
+PS D:\docker\minikube_cluster_example> kubectl get pods
+NAME                              READY   STATUS         RESTARTS   AGE
+hombreamparokube-5cf7964c-gxrpg   0/1     ErrImagePull   0          2m
+
+PS D:\docker\minikube_cluster_example> kubectl logs hombreamparokube-5cf7964c-gxrpg
+Error from server (BadRequest): container "kuberfirst" in pod "hombreamparokube-5cf7964c-gxrpg" is waiting to start: trying and failing to pull image
+
+Así que o la subimos o modificamos algunas variables de entorno. Esta vez haremos lo primero: 
+
+PS D:\docker\minikube_cluster_example> docker push matt68/kuberfirst:parte1
+The push refers to repository [docker.io/matt68/kuberfirst]
+ad02114386ab: Pushed
+aeaa1edefd60: Mounted from library/node
+6e650662f0e3: Mounted from library/node
+8c825a971eaf: Mounted from library/node
+bf769027dbbd: Mounted from library/node
+f3693db46abb: Mounted from library/node
+bb6d734b467e: Mounted from library/node
+5f349fdc9028: Mounted from library/node
+2c833f307fd8: Mounted from library/node
+parte1: digest: sha256:b84e1f090564bebab8cf1869ad4604c5db51ce3d8e482650f9c098687be45669 size: 2214
+
+Y ahora, una vez subida volvemos a lanzar el deployment:
+
+*****************************************************************************************************************
+PS D:\docker\minikube_cluster_example> kubectl create deployment hombreamparokube --image=matt68/kuberfirst:parte1
+deployment.apps/hombreamparokube created
+
+PS D:\docker\minikube_cluster_example> kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+hombreamparokube   0/1     1            0           13s
+
+PS D:\docker\minikube_cluster_example> kubectl get pods
+NAME                              READY   STATUS              RESTARTS   AGE
+hombreamparokube-5cf7964c-jvtl6   0/1     ContainerCreating   0          21s
+
+... Vemos que no está listo porque tardará un tiempo en descargar la imagen y crear el container...
+
+PS D:\docker\minikube_cluster_example> kubectl get deployments
+NAME               READY   UP-TO-DATE   AVAILABLE   AGE
+hombreamparokube   1/1     1            1           4m51s
+
+PS D:\docker\minikube_cluster_example> kubectl get pods
+NAME                              READY   STATUS    RESTARTS   AGE
+hombreamparokube-5cf7964c-jvtl6   1/1     Running   0          9m12s
+
+Podemos ver otros detalles:
+PS D:\docker\minikube_cluster_example> kubectl get events
+LAST SEEN   TYPE      REASON                    KIND         MESSAGE
+16m         Normal    Scheduled                 Pod          Successfully assigned default/hombreamparokube-5cf7964c-9lk8g to minikube
+16m         Normal    Pulling                   Pod          pulling image "matt68/kuberfirst:parte1"
+16m         Warning   Failed                    Pod          Failed to pull image "matt68/kuberfirst:parte1": rpc error: code = Unknown desc = Error response om daemon: pull access denied for matt68/kuberfirst, repository does not exist or may require 'docker login'
+24m         Warning   Failed                    Pod          Error: ErrImagePull
+24m         Normal    BackOff                   Pod          Back-off pulling image "matt68/kuberfirst:parte1"
+21m         Warning   Failed                    Pod          Error: ImagePullBackOff
+10m         Normal    Scheduled                 Pod          Successfully assigned default/hombreamparokube-5cf7964c-jvtl6 to minikube
+10m         Normal    Pulling                   Pod          pulling image "matt68/kuberfirst:parte1"
+9m28s       Normal    Pulled                    Pod          Successfully pulled image "matt68/kuberfirst:parte1"
+9m28s       Normal    Created                   Pod          Created container
+9m27s       Normal    Started                   Pod          Started container
+26m         Normal    SuccessfulCreate          ReplicaSet   Created pod: hombreamparokube-5cf7964c-gxrpg
+16m         Normal    SuccessfulCreate          ReplicaSet   Created pod: hombreamparokube-5cf7964c-9lk8g
+10m         Normal    SuccessfulCreate          ReplicaSet   Created pod: hombreamparokube-5cf7964c-jvtl6
+26m         Normal    ScalingReplicaSet         Deployment   Scaled up replica set hombreamparokube-5cf7964c to 1
+10m         Normal    ScalingReplicaSet         Deployment   Scaled up replica set hombreamparokube-5cf7964c to 1
+28m         Normal    Starting                  Node         Starting kubelet.
+28m         Normal    NodeHasSufficientMemory   Node         Node minikube status is now: NodeHasSufficientMemory
+28m         Normal    NodeHasNoDiskPressure     Node         Node minikube status is now: NodeHasNoDiskPressure
+28m         Normal    NodeHasSufficientPID      Node         Node minikube status is now: NodeHasSufficientPID
+28m         Normal    NodeAllocatableEnforced   Node         Updated Node Allocatable limit across pods
+28m         Normal    RegisteredNode            Node         Node minikube event: Registered Node minikube in Controller
+28m         Normal    Starting                  Node         Starting kube-proxy.
+
+PS D:\docker\minikube_cluster_example> kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: D:\docker\.minikube\ca.crt
+    server: https://192.168.99.105:8443
+  name: minikube
+contexts:
+- context:
+    cluster: minikube
+    user: minikube
+  name: minikube
+current-context: minikube
+kind: Config
+preferences: {}
+users:
+- name: minikube
+  user:
+    client-certificate: D:\docker\.minikube\client.crt
+    client-key: D:\docker\.minikube\client.key
+
+*****************************************************************************************************************
+*****************************************************************************************************************
+Si queremos acceder al cluster desde el exterior debemos definir el servicio en kubernetes y hacerlo accesible 
+ en el cluster (en este caso minikube):
+
+PS D:\docker\minikube_cluster_example> kubectl expose deployment hombreamparokube --type=LoadBalancer --port=8080
+service/hombreamparokube exposed
+
+*****************************************************************************************************************
+ Ya está expuesto, como podemos comprobar, pero aún no es accesible porque el cluster no lo ha abierto:
+
+PS D:\docker\minikube_cluster_example> kubectl get services
+NAME               TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+hombreamparokube   LoadBalancer   10.104.231.235   <pending>     8080:30452/TCP   8s
+kubernetes         ClusterIP      10.96.0.1        <none>        443/TCP          35m
+PS D:\docker\minikube_cluster_example> kubectl get services
+NAME               TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+hombreamparokube   LoadBalancer   10.104.231.235   <pending>     8080:30452/TCP   59s
+kubernetes         ClusterIP      10.96.0.1        <none>        443/TCP          36m
+
+*****************************************************************************************************************
+ Al abrirlo en el cluster, todo listo: 
+PS D:\docker\minikube_cluster_example> minikube service hombreamparokube
+-   Opening kubernetes service default/hombreamparokube in default browser...
+
+ Y veremos que aunque no se haya abierto la IP al exterior, podremos acceder con la IP que recogemos de 
+kubectl config view
+
+ y el puerto 30452 que es el expuesto por defecto -asignado por kubectl-.
+*****************************************************************************************************************
+*****************************************************************************************************************
+   CONCLUSION
+
+ Hemos visto cómo podemos lanzar una imagen de docker en Kubernetes, sin embargo, si no lo hacemos directamente
+ en un proveedor Cloud, la única opción disponible es montar un cluster de un sólo nodo con minikube.
+ 
+ Vimos en un ejercicio anterior como montar un cluster de máquinas y luego ejecutar docker swarm sobre él.
+
+ Docker swarm tiene la ventaja de ser más sencillo y rápido de montar, pero no luego el cluster no es tan configurable 
+ y manejable como un cluster de kubernetes (balanceo de carga, tolerancia a fallos, etc.).
+
+ Existe un proyecto para montar en un sólo ordenador un cluster de máquinas virtuales con minikube
+
+ kubernetes-sigs/kubeadm-dind-cluster
+
+ La otra opción sería usar GKE (Google Kubernetes Engine), AWS, etc.
+
+*****************************************************************************************************************
+*****************************************************************************************************************
+
+ 
+ 
+
+
+
+

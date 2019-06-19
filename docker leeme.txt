@@ -1,0 +1,146 @@
+
+Instalando docker.-
+
+Si tenemos Windows 10 Pro, podemos instalar Docker Desktop que incluye:
+ Docker Engine, Docker CLI client, Docker Compose, Docker Machine, and Kitematic.
+ Docker Desktop necesita Microsoft Hyper-V -que sólo está a partir de Windows 10 Pro-.
+
+Si no tenemos Windows 10 Pro, instaleremos Docker Toolbox, que incluye:
+    Docker Machine for running docker-machine commands
+    Docker Engine for running the docker commands
+    Docker Compose for running the docker-compose commands
+    Kitematic, the Docker GUI
+    a shell preconfigured for a Docker command-line environment
+    Oracle VirtualBox
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX   PowerShell          XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+Para ejecutar todos estos comandos en Windows, lo haremos desde PowerShell.
+PowerShell es un intérprete de comandos (una shell) para Windows. Tiene sus propios comandos y
+sus archivos de configuraciones. En nuestro caso vamos a configurar powershell para que tenga
+unos colores específicos y empieze siempre ubicándonos en nuestro directorio de trabajo y haciendo 
+un listado de los contenidos.
+
+En la carpeta C:\Users\"Usuario"\Documents\WindowsPowerShell
+debemos crear el fichero "Microsoft.PowerShell_profile.ps1" 
+con el siguiente contenido:
+
+$console = $host.ui.rawui
+$console.backgroundcolor = "DarkMagenta"
+$console.foregroundcolor = "white"
+$colors = $host.privatedata
+$colors.verbosebackgroundcolor = "Magenta"
+$colors.verboseforegroundcolor = "Green"
+$colors.warningbackgroundcolor = "Red"
+$colors.warningforegroundcolor = "white"
+$colors.ErrorBackgroundColor = "DarkMagenta"
+$colors.ErrorForegroundColor = "DarkGray"
+$colors.ProgressForegroundColor = "cyan"
+$colors.ProgressBackgroundColor = "black"
+set-location C:\AA_Sync_QNAP\docker
+ls 
+# clear-host
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+En los siguientes ejemplos, usaremos Windows 7, por tanto, docker-machine y sobre él docker.
+
+Empezando con docker:
+
+Empezamos por obtener alguna de las imágenes disponibles en docker hub.
+
+Ejecutaremos la imagen descargada para crear un container.
+
+Las imágenes a veces son básicas, y es necesario instalar una serie de librerías mínimas
+para que funcionen algunos procesos/comandos.
+
+Por ejemplo, ubuntu.
+
+Librerías necesarias para comunicación de containers (para poder lanzar ip, ifconfig o ping):
+
+apt-get  update
+apt-get  install iproute2
+apt-get  install iputils-ping
+
+Así funcionarán estos comandos:
+ip a
+ping 172.17.0.2
+
+Comandos para comprobar el estado de la red:
+docker network ls 
+docker network inspect bridge
+
+Para comprobar la configuración del docker, en Windows 7 hacemos:
+
+docker-machine env
+
+Y nos devuelve: 
+PS C:\Users\MAP> docker-machine env
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.100:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\MAP\.docker\machine\machines\default"
+$Env:DOCKER_MACHINE_NAME = "default"
+$Env:COMPOSE_CONVERT_WINDOWS_PATHS = "true"
+# Run this command to configure your shell:
+# & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env | Invoke-Expression
+(si tenemos Windows 10 Pro, y hemos podido instalar Docker Desktop no es necesario docker-machine)
+
+Donde podemos comprobar que en el network bridge, la IP que usa docker para esta VM es 192.168.99.100.
+
+ docker images
+ 
+ # Para crear una imagen a partir de un Dockerfile y los archivos existentes en el directorio actual
+ more .\app.py
+ more .\Dockerfile
+
+ docker build  -t=holaamparo .
+  
+ docker images
+ # Para ejecutar la imagen y crear una instancia de la imagen, o sea un container (que nombramos como python1).
+ 
+ docker run -d --name python1 -p 4000:80 holaamparo
+ 
+ docker container ls
+ docker stop python1
+ # Etiquetamos la imagen local para asociarla con mi repositorio matt68
+ docker tag holaamparo matt68/primerpython:parte2
+ docker container ls
+ docker images
+ 
+ # Publicamos la imagen subiendola al docker hub
+ docker login
+ docker push matt68/primerpython:parte2
+ 
+ docker images
+ # Borramos la imagen local
+ docker stop python1
+ docker rm   python1
+ docker rmi matt68/primerpython:parte2
+
+ # Ejecutamos de nuevo la imagen para ver c¢mo la baja del repositorio
+ 
+ docker run -d --name remote_py -p 4000:80 matt68/primer-python:parte1
+ 
+ Unable to find image 'matt68/primer-python:parte1' locally
+ parte1: Pulling from matt68/primer-python
+ f7e2b70d04ae: Already exists
+ 1e9214730e83: Already exists
+ 5bd4ec081f7b: Already exists
+ be26b369a1e7: Already exists
+ 0bb7b548664c: Pull complete
+ 40f74e517de9: Pull complete
+ 3e99a85d30d3: Pull complete
+ Digest: sha256:fb8a60d7a180bfd937417df389fca803ccea4b30402cd14891853416c3a51c3f
+ Status: Downloaded newer image for matt68/primer-python:parte1
+ c1f1ad2126f55952e3dfbfddb9c0b6021ea59bda583ff613d8a6dc0a5846672c
+ 
+PS D:\docker\python_app> docker images
+REPOSITORY             TAG                 IMAGE ID            CREATED             SIZE
+holaamparo             latest              3fa47d618081        14 minutes ago      131MB
+matt68/primerpython    parte2              3fa47d618081        14 minutes ago      131MB
+matt68/primer-python   parte1              077ec3ab3d7f        About an hour ago   131MB
+matt68                 db2expc             a170bf8c410b        7 days ago          1.71GB
+python                 2.7-slim            8559620b5b0d        2 weeks ago         120MB
+ubuntu                 latest              47b19964fb50        5 weeks ago         88.1MB
+centos                 latest              1e1148e4cc2c        3 months ago        202MB
+ibmcom/db2express-c    latest              7aa154d9b73c        3 years ago         1.71GB

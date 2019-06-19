@@ -1,0 +1,67 @@
+
+ El objetivo final del presente curso, será hacer prácticas de Machine Learning.
+
+ Por ello, vamos a empezar creando una imagen de docker con Tensorflow, 
+ la última gran incoroporación al mundo ML. 
+
+ El framework TensorFlow de Google, apareción hace cuatro años, pero ya está asentado
+ como el framework de referencia para ML y DL. Se integra con diferentes lenguajes
+ (especialmente bien con R-Studio) que le hacen ampliamente utilizado por diferentes perfiles
+ (desde principiantes a expertos).
+
+ Para crear esta imagen, vamos a partir de un Dockerfile que tiene incorporado los elementos base
+ para que Hadoop y TensorFlow funcionen correctamente:
+ 1.- Una imagen base, p.e. ubuntu:16.04
+ 1.- JDK 1.8
+ 2.- Hadoop 3.2
+ 3.- Librerías necesarias para Tensorflow (p.e.python, scipy. Para soporte GPU necesitaría: cuda, cudnn, etc)
+ 4.- El package Tensorflow  
+ 
+
+ El Dockerfile sería algo así:
+
+FROM ubuntu:16.04
+
+# Lo primero son los paquetes necesarios para acceder a HDFS
+# JDK y Hadoop
+RUN apt-get update && apt-get install -y openjdk-8-jdk wget
+RUN wget http://apache.cs.utah.edu/hadoop/common/hadoop-3.2.0/hadoop-3.2.0.tar.gz
+RUN tar zxf hadoop-3.2.0.tar.gz
+
+# Descargamos algunas librerias necesarias para TF 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        curl \
+        libfreetype6-dev \
+        libpng12-dev \
+        libzmq3-dev \
+        pkg-config \
+        python \
+        python-dev \
+        rsync \
+        software-properties-common \
+        unzip \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -O https://bootstrap.pypa.io/get-pip.py && \
+    python get-pip.py && \
+    rm get-pip.py
+
+RUN pip --no-cache-dir install \
+        Pillow \
+        h5py \
+        ipykernel \
+        jupyter \
+        matplotlib \
+        numpy \
+        pandas \
+        scipy \
+        sklearn \
+        && \
+    python -m ipykernel.kernelspec
+
+RUN pip --no-cache-dir install \
+    http://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-1.8.0-cp27-none-linux_x86_64.whl
+

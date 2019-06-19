@@ -1,0 +1,138 @@
+
+ INSTALACION DE KUBERNETES EN UN ENTORNO LOCAL CON WINDOWS.
+
+*****************************************************************************************************************
+ - Si tenemos Docker Desktop (a partir de Windows 10 Pro), ya tenemos instalado kubernetes, viene integrado.
+
+   Pero si tenemos Docker Toolbox -p.e.n Windows 7- necesitamos instalarlo a mano.
+   Vamos a instalar desde PowerShell:
+
+*****************************************************************************************************************
+Empezamos por instalar kubectl.
+*****************************************************************************************************************
+
+    Desde PowerShell o un cmd en Windows, y con el uso de chocolatey:
+
+PS C:\Windows\system32> choco install kubernetes-cli
+Chocolatey v0.10.11
+Installing the following packages:
+kubernetes-cli
+By installing you accept licenses for the packages.
+Progress: Downloading kubernetes-cli 1.13.4... 100%
+kubernetes-cli v1.13.4 [Approved]
+kubernetes-cli package files install completed. Performing other installation steps.
+The package kubernetes-cli wants to run 'chocolateyInstall.ps1'.
+Note: If you don't run this script, the installation will fail.
+Note: To confirm automatically next time, use '-y' or consider:
+choco feature enable -n allowGlobalConfirmation
+Do you want to run the script?([Y]es/[N]o/[P]rint): Y
+Extracting 64-bit C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\kubernetes-client-windows-amd64.tar.gz to C:\ProgramData\chocolatey\lib\kubernetes-cli\tools...
+C:\ProgramData\chocolatey\lib\kubernetes-cli\tools
+Extracting 64-bit C:\ProgramData\chocolatey\lib\kubernetes-cli\tools\kubernetes-client-windows-amd64.tar to C:\ProgramData\chocolatey\lib\kubernetes-cli\tools...
+C:\ProgramData\chocolatey\lib\kubernetes-cli\tools
+ ShimGen has successfully created a shim for kubectl.exe
+ The install of kubernetes-cli was successful.
+  Software installed to 'C:\ProgramData\chocolatey\lib\kubernetes-cli\tools'
+Chocolatey installed 1/1 packages.
+ See the log for details (C:\ProgramData\chocolatey\logs\chocolatey.log).
+
+PS C:\Windows\system32> kubectl version
+Client Version: version.Info{Major:"1", Minor:"13", GitVersion:"v1.13.4", GitCommit:"c27b913fddd1a6c480c229191a087698aa92f0b1", GitTreeState:"clean", BuildDate:"2019-02-28T13:37:52Z", GoVersion:"go1.11.5", Compiler:"gc", Platform:"windows/amd64"}
+Unable to connect to the server: dial tcp 127.0.0.1:8080: connectex: No se puede establecer una conexión ya que el equipo de destino denegó expresamente dicha conexión.
+
+*****************************************************************************************************************
+Creamos el directorio .kube en nuestro directorio de trabajo:
+
+PS C:\Windows\system32> d:
+PS D:\> cd docker
+PS D:\docker> mkdir .kube
+    Directorio: D:\docker
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+d----        22/03/2019     11:55            .kube
+
+PS D:\docker> ls
+    Directorio: D:\docker
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+d----        22/03/2019     11:55            .kube
+d----        12/03/2019     17:52            db2expc
+d----        28/02/2019     10:03            machine
+d----        20/03/2019     14:17            python_app
+d----        21/03/2019     13:17            python_stack_app
+d----        21/03/2019     13:54            python_stack_redis_app
+-a---        19/03/2019     23:38        163 config.json
+-a---        20/03/2019     23:13       4484 docker leeme.txt
+-a---        21/03/2019     14:03      14427 docker_stack.txt
+-a---        21/03/2019      1:16      26505 docker_swarm.txt
+-a---        22/03/2019     11:39          0 kubernetes.txt
+
+*****************************************************************************************************************
+ Creamos el fichero de configuracion de kubernetes
+
+PS D:\docker> cd .kube
+PS D:\docker\.kube> New-Item config -type file
+PS D:\docker\.kube> ls
+    Directorio: D:\docker\.kube
+Mode                LastWriteTime     Length Name
+----                -------------     ------ ----
+-a---        22/03/2019     11:56          0 config
+
+*****************************************************************************************************************
+ Instalar minikube.
+*****************************************************************************************************************
+ Si ejecutamos kubectl version, o cualquier comando, siempre da un error que contiene: " ...Unable to connect to the server: ..."
+ Antes de nada, debemos instalar minikube.
+ 
+PS D:\docker\.kube>choco install minikube 
+
+*****************************************************************************************************************
+ Al arrancar puede dar problemas si no lo hacemos desde la unidad donde está instalado el minikube (en C:)
+ Esto tiene dos soluciones:
+ 1.- Arrancar desde C:
+ 2.- Modificar la variable de entorno de PowerShell MINIKUBE_HOME y poner la unidad D o un directorio en D:/docker
+        MINIKUBE_HOME                  D:/docker
+     En mi caso además he cambiado un par de variables de entorno:
+        HOMEDRIVE                      D:
+        HOMEPATH                       docker
+     El comando para cambiar variables de entorno en PowerShell:
+     PS D:\docker> $env:MINIKUBE_HOME = "D:/docker"
+     Y para comprobar:
+     PS D:\docker> Get-ChildItem env:
+
+  Así que borramos el cluster y lo volvemos a crear.
+
+PS C:\Windows\system32> minikube delete
+x   Deleting "minikube" from virtualbox ...
+-   The "minikube" cluster has been deleted.
+PS C:\Windows\system32> minikube start
+o   minikube v0.35.0 on windows (amd64)
+>   Creating virtualbox VM (CPUs=2, Memory=2048MB, Disk=20000MB) ...
+@   Downloading Minikube ISO ...
+ 184.42 MB / 184.42 MB [============================================] 100.00% 0s
+-   "minikube" IP address is 192.168.99.100
+o   Found network options:
+    - NO_PROXY=192.168.99.100
+-   Configuring Docker as the container runtime ...
+-   Preparing Kubernetes environment ...
+@   Downloading kubelet v1.13.4
+@   Downloading kubeadm v1.13.4
+-   Pulling images required by Kubernetes v1.13.4 ...
+-   Launching Kubernetes v1.13.4 using kubeadm ...
+:   Waiting for pods: apiserver proxy etcd scheduler controller addon-manager dns
+-   Configuring cluster permissions ...
+-   Verifying component health .....
++   kubectl is now configured to use "minikube"
+=   Done! Thank you for using minikube!
+
+
+*****************************************************************************************************************
+
+ Ya tenemos el cluster, ahora necesitamos hacer un despliegue en él.
+ Para ello necesitamos una imagen que desplegar.
+ Vamos al directorio D:\docker\minikube_cluster_example 
+ y ahí crearemos una con docker build ...
+
+
+
+    

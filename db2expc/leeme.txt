@@ -1,0 +1,89 @@
+
+La imagen la he descargado de ibmcom/db2express-c, con:
+
+docker pull ibmcom/db2express-c
+
+Una vez añadida la imagen al repositorio local, podemos arrancar varios tipos de containers. 
+
+1.- Frontend/Online para tirar comandos db2:
+
+docker run -it -p 50000:50000 -e DB2INST1_PASSWORD=ibm2blue -e LICENSE=accept ibmcom/db2express-c:latest bash
+
+Podemos empezar a lanzar comandos:
+su - db2inst1
+db2start
+db2sampl
+etc.
+
+2.- Proceso en el backend. DB2  esperando conexiones: 
+
+docker run -d -p 50000:50000 -e DB2INST1_PASSWORD=db2inst1-pwd 
+            -e LICENSE=accept  ibmcom/db2express-c:latest db2start
+
+db2start
+-- Y el puerto 50000 -del docker host- ya está expuesto a conexiones
+-- (aunque no tenemos nada instalado)
+-- Para instalar la base de datos sample podemos hacer:
+docker container exec -it nombre_container su - db2inst1
+
+[db2inst1@34105323b9e6 ~]$ id
+uid=1000(db2inst1) gid=1001(db2inst1) groups=1001(db2inst1),1000(db2iadm1)
+[db2inst1@34105323b9e6 ~]$ db2sampl
+
+  Creating database "SAMPLE"...
+  Connecting to database "SAMPLE"...
+  Creating tables and data in schema "DB2INST1"...
+  Creating tables with XML columns and XML data in schema "DB2INST1"...
+
+  'db2sampl' processing complete.
+
+[db2inst1@34105323b9e6 ~]$ tail /etc/services
+isnetserv       48128/tcp               # Image Systems Network Services
+isnetserv       48128/udp               # Image Systems Network Services
+blp5            48129/tcp               # Bloomberg locator
+blp5            48129/udp               # Bloomberg locator
+com-bardac-dw   48556/tcp               # com-bardac-dw
+com-bardac-dw   48556/udp               # com-bardac-dw
+iqobject        48619/tcp               # iqobject
+iqobject        48619/udp               # iqobject
+matahari        49000/tcp               # Matahari Broker
+db2c_db2inst1   50000/tcp
+
+
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+ Aunque en teoría no hay conectividad desde Windows hacia los containers... he conseguido conectar
+ un IBM Data Studio contra un DB2 dentro de un container.
+
+ He configurado la conexión apuntando hacia la ip 192.168.99.100 en el puerto 50000 -que es el definido 
+ para la instancia dentro del container-.
+ He comprobado que la IP sobre la que mapea en el Windows es esa. Internamente el container está en otro rango 
+ de direcciones, 172.17.0.2
+
+ Salida en el host Windows del comando ipconfig: 
+
+ Adaptador de Ethernet VirtualBox Host-Only Network #2:
+
+   Sufijo DNS específico para la conexión. . :
+   Vínculo: dirección IPv6 local. . . : fe80::3840:2692:213a:6886%46
+   Dirección IPv4. . . . . . . . . . . . . . : 192.168.99.1
+   Máscara de subred . . . . . . . . . . . . : 255.255.255.0
+   Puerta de enlace predeterminada . . . . . :
+
+Y comprobando el entorno de Windows en el que se ejectua docker, encontramos:
+
+docker-machine env
+
+Y nos devuelve: 
+PS C:\Users\MAP> docker-machine env
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.100:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\MAP\.docker\machine\machines\default"
+$Env:DOCKER_MACHINE_NAME = "default"
+$Env:COMPOSE_CONVERT_WINDOWS_PATHS = "true"
+# Run this command to configure your shell:
+# & "C:\ProgramData\chocolatey\lib\docker-machine\bin\docker-machine.exe" env | Invoke-Expression
+
+Donde podemos comprobar que en el network bridge, la IP que usa docker para esta VM es 192.168.99.100.
+
+
+

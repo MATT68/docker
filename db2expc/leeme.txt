@@ -3,7 +3,7 @@ La imagen la he descargado de ibmcom/db2express-c, con:
 
 docker pull ibmcom/db2express-c
 
-Una vez añadida la imagen al repositorio local, podemos arrancar varios tipos de containers. 
+Una vez agregada la imagen al repositorio local, podemos arrancar varios tipos de containers. 
 
 1.- Frontend/Online para tirar comandos db2:
 
@@ -21,7 +21,7 @@ docker run -d -p 50000:50000 -e DB2INST1_PASSWORD=db2inst1-pwd
             -e LICENSE=accept  ibmcom/db2express-c:latest db2start
 
 db2start
--- Y el puerto 50000 -del docker host- ya está expuesto a conexiones
+-- Y el puerto 50000 -del docker host- ya estï¿½ expuesto a conexiones
 -- (aunque no tenemos nada instalado)
 -- Para instalar la base de datos sample podemos hacer:
 docker container exec -it nombre_container su - db2inst1
@@ -51,22 +51,22 @@ db2c_db2inst1   50000/tcp
 
 
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
- Aunque en teoría no hay conectividad desde Windows hacia los containers... he conseguido conectar
+ Aunque en teorï¿½a no hay conectividad desde Windows hacia los containers... he conseguido conectar
  un IBM Data Studio contra un DB2 dentro de un container.
 
- He configurado la conexión apuntando hacia la ip 192.168.99.100 en el puerto 50000 -que es el definido 
+ He configurado la conexiï¿½n apuntando hacia la ip 192.168.99.100 en el puerto 50000 -que es el definido 
  para la instancia dentro del container-.
- He comprobado que la IP sobre la que mapea en el Windows es esa. Internamente el container está en otro rango 
+ He comprobado que la IP sobre la que mapea en el Windows es esa. Internamente el container estï¿½ en otro rango 
  de direcciones, 172.17.0.2
 
  Salida en el host Windows del comando ipconfig: 
 
  Adaptador de Ethernet VirtualBox Host-Only Network #2:
 
-   Sufijo DNS específico para la conexión. . :
-   Vínculo: dirección IPv6 local. . . : fe80::3840:2692:213a:6886%46
-   Dirección IPv4. . . . . . . . . . . . . . : 192.168.99.1
-   Máscara de subred . . . . . . . . . . . . : 255.255.255.0
+   Sufijo DNS especï¿½fico para la conexiï¿½n. . :
+   Vï¿½nculo: direcciï¿½n IPv6 local. . . : fe80::3840:2692:213a:6886%46
+   Direcciï¿½n IPv4. . . . . . . . . . . . . . : 192.168.99.1
+   Mï¿½scara de subred . . . . . . . . . . . . : 255.255.255.0
    Puerta de enlace predeterminada . . . . . :
 
 Y comprobando el entorno de Windows en el que se ejectua docker, encontramos:
